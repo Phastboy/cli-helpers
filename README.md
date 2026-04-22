@@ -11,13 +11,13 @@ A collection of simple, effective command-line utilities and scripts I use to au
 > 📦 Interactive installer (lets you choose a script):
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tgenericx/cli-helpers/main/install)
+bash <(curl -fsSL https://raw.githubusercontent.com/phastboy/cli-helpers/main/install)
 ```
 
 > 🧪 Install **all available** tools at once:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tgenericx/cli-helpers/main/install | bash -s -- --all
+curl -fsSL https://raw.githubusercontent.com/phastboy/cli-helpers/main/install | bash -s -- --all
 ```
 
 > 🧼 Automatically handles `sudo` or not (Termux-friendly)
