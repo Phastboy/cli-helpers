@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+
+info() { echo "📌 $1"; }
+success() { echo "✅ $1"; }
+warn() { echo "⚠️  $1"; }
+error() { echo "❌ $1"; }
+
+DIRECTORY=""
+OUTPUT_FILE=""
+EXCLUDE_FILE=""
+VERBOSE=false
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+  -o | --output)
+    OUTPUT_FILE="$2"
+    shift 2
+    ;;
+  -E | --exclude-from)
+    EXCLUDE_FILE="$2"
+    shift 2
+    ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    echo "Usage: $0 <dir> [-E file] [-o out] [-v]"
+    exit 0
+    ;;
+  *)
+    DIRECTORY="$1"
+    shift
+    ;;
+  esac
+done
+
+[ -z "$DIRECTORY" ] && {
+  error "Directory required"
+  exit 1
+}
+[ ! -d "$DIRECTORY" ] && {
+  error "Invalid directory"
+  exit 1
+}
+
+EXCLUDE_PATTERNS=()
+if [ -n "$EXCLUDE_FILE" ] && [ -f "$EXCLUDE_FILE" ]; then
+  while IFS= read -r line; do
+    [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+    line=$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    [ -n "$line" ] && EXCLUDE_PATTERNS+=("$line")
+  done <"$EXCLUDE_FILE"
+fi
+
+DIRS=()
+FILES=()
+
+for p in "${EXCLUDE_PATTERNS[@]}"; do
+  p="${p%/}"
+  if [[ "$p" == *"*"* || "$p" == *"?"* ]]; then
+    FILES+=("$p")
+  else
+    DIRS+=("$p")
+  fi
+done
+
+DIRECTORY=$(cd "$DIRECTORY" && pwd)
+
+$VERBOSE && info "Pruning: ${DIRS[*]}"
+$VERBOSE && info "Filtering: ${FILES[*]}"
+
+matches_exclude() {
+  local file="$1"
+  local name
+  name=$(basename "$file")
+
+  for pat in "${FILES[@]}"; do
+    [[ "$name" == $pat ]] && return 0
+  done
+  return 1
+}
+
+[ -z "$OUTPUT_FILE" ] &&
+  OUTPUT_FILE="content_$(basename "$DIRECTORY")_$(date +%Y%m%d_%H%M%S).log"
+
+info "Scanning and processing..."
+
+FIND_CMD=(find "$DIRECTORY")
+
+for d in "${DIRS[@]}"; do
+  FIND_CMD+=(-path "*/$d/*" -prune -o)
+done
+
+FIND_CMD+=(-type f -print0)
+
+$VERBOSE && {
+  echo -n "Command: "
+  printf "%q " "${FIND_CMD[@]}"
+  echo
+} >&2
+
+i=0
+
+{
+  echo "=========================================="
+  echo "Directory Content Log"
+  echo "Generated: $(date)"
+  echo "Directory: $DIRECTORY"
+  echo "=========================================="
+  echo ""
+  echo "=========================================="
+  echo "FILE CONTENTS"
+  echo "=========================================="
+  echo ""
+
+  while IFS= read -r -d '' file; do
+    [ -f "$file" ] || continue
+    matches_exclude "$file" && continue
+
+    ((i++))
+    rel="${file#$DIRECTORY/}"
+
+    $VERBOSE && printf "\r  %d files..." "$i" >&2
+
+    echo "=========================================="
+    echo "[$i] $rel"
+    echo "=========================================="
+
+    if grep -Iq . "$file"; then
+      cat "$file"
+    else
+      echo "[Binary]"
+    fi
+
+    echo
+    echo
+
+  done < <("${FIND_CMD[@]}" 2>/dev/null)
+
+  $VERBOSE && echo "" >&2
+
+} >"$OUTPUT_FILE"
+
+success "Done: $i files → $OUTPUT_FILE ($(du -h "$OUTPUT_FILE" | cut -f1))"
