@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-REPO="tgenericx/cli-helpers"
+REPO="phastboy/cli-helpers"
 BRANCH="main"
 BASE_URL="https://raw.githubusercontent.com/$REPO/refs/heads/$BRANCH"
 UTILS_FILE="utils.txt"
